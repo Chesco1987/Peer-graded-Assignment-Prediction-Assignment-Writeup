@@ -1,0 +1,143 @@
+---
+title: 'Peer-graded Assignment: Prediction Assignment Writeup'
+author: "Francesco Mancino"
+date: "31 de enero de 2019"
+output: html_document
+---
+
+##Final project for the Practical Machine Learning Course.
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+##First steps 
+Once uploaded the training and testing datasets, an exploratory analysis was made to determind: Types of variables, structure of the variables (factor, numeric, integer etc), any anomalies in the variables. 
+
+
+```{r }
+training<-read.csv("C:/Users/fmancino/Desktop/R/Practical Machine Learning Course/pml-training.csv",
+                   na.strings = c(" #DIV/0!","#DIV/0!"))
+
+testing<-read.csv("C:/Users/fmancino/Desktop/R/Practical Machine Learning Course/pml-testing.csv")
+
+sum(!complete.cases(training)) ##no complete cases in the training dataset
+sum(!complete.cases(testing)) ##no complete cases in the testing dataset
+
+summary(training)
+```
+
+From the summary of variables it was possible to determind that many variables had more than 80% of missing values. The neccesary step was to delete these variables from the dataset and consider only variabels with no missing values. 
+
+```{r }
+myvars<-names(training) %in% c("X", "raw_timestamp_part_1", "raw_timestamp_part_2",
+"kurtosis_yaw_belt", "skewness_yaw_belt", "max_roll_belt", "max_picth_belt", 
+"min_roll_belt",  "min_pitch_belt", "amplitude_roll_belt", "amplitude_pitch_belt",
+"amplitude_yaw_belt", "var_total_accel_belt", "avg_roll_belt", "stddev_roll_belt",
+"var_roll_belt", "avg_pitch_belt", "stddev_pitch_belt", "var_pitch_belt", "avg_yaw_belt",
+"stddev_yaw_belt",  "var_yaw_belt", "var_accel_arm", "avg_roll_arm", "stddev_roll_arm",
+"var_roll_arm", "avg_pitch_arm", "stddev_pitch_arm", "var_pitch_arm", "avg_yaw_arm", "stddev_yaw_arm",
+"var_yaw_arm", "max_roll_arm", "max_picth_arm",  "max_yaw_arm", "min_roll_arm", "min_pitch_arm",
+"min_yaw_arm", "amplitude_roll_arm", "amplitude_pitch_arm", "amplitude_yaw_arm", "kurtosis_yaw_dumbbell",
+"skewness_yaw_dumbbell", "max_roll_dumbbell","max_picth_dumbbell",  "min_roll_dumbbell", "min_pitch_forearm",
+"amplitude_roll_forearm", "amplitude_pitch_forearm", "amplitude_yaw_forearm", "var_accel_forearm", 
+"avg_roll_forearm",  "stddev_roll_forearm", "var_roll_forearm", "avg_pitch_forearm", "stddev_pitch_forearm",
+"var_pitch_forearm", "avg_yaw_forearm", "stddev_yaw_forearm", "var_yaw_forearm", 
+"kurtosis_yaw_forearm","skewness_yaw_forearm", "min_pitch_dumbbell", "min_yaw_dumbbell", "amplitude_roll_dumbbell",
+"amplitude_yaw_forearm", "amplitude_pitch_dumbbell", "amplitude_yaw_dumbbell", "total_accel_dumbbell", "var_accel_dumbbell",
+"avg_roll_dumbbell", "stddev_roll_dumbbell", "var_roll_dumbbell", "avg_pitch_dumbbell", "stddev_pitch_dumbbell",
+"var_pitch_dumbbell", "avg_yaw_dumbbell", "stddev_yaw_dumbbell", "var_yaw_dumbbell", "kurtosis_roll_belt", 
+"kurtosis_picth_belt", "skewness_roll_belt", "skewness_roll_belt.1", "max_yaw_belt", "min_yaw_belt", 
+"kurtosis_roll_arm", "kurtosis_picth_arm", "kurtosis_yaw_arm", "skewness_roll_arm",
+"skewness_pitch_arm", "skewness_yaw_arm", "kurtosis_roll_dumbbell",
+"kurtosis_picth_dumbbell", "skewness_roll_dumbbell", "skewness_pitch_dumbbell", "max_yaw_dumbbell",
+"kurtosis_roll_forearm","kurtosis_picth_forearm", "skewness_roll_forearm", "skewness_pitch_forearm", "max_roll_forearm", 
+"max_picth_forearm","max_yaw_forearm", "min_yaw_forearm", "min_roll_forearm", "cvtd_timestamp", "new_window", "num_window")
+
+df<-training[!myvars]
+```
+
+The remaining variabels where then changed to numeric format, except for user name and classe.
+
+```{r }
+df$total_accel_belt<-as.numeric(df$total_accel_belt)
+cols = c(8:14, 17:18, 21:27, 33:38, 42:43, 46:50)
+df[,cols]= apply(df[,cols], 2, function(x) as.numeric(as.character(x)))
+```
+
+##Descriptive Statistics 
+Some descriptive statistics were made on selected variables to explore the behaviour of the variables and their relationships.
+
+Tables
+```{r }
+table(df$user_name, df$classe)
+a1<-aggregate(df$roll_belt, by=list(df$user_name, df$classe), FUN= mean)
+a2<-aggregate(df$pitch_belt, by=list(df$user_name, df$classe), FUN= mean)
+a3<-aggregate(df$yaw_belt, by=list(df$user_name, df$classe), FUN= mean)
+a4<-aggregate(df$roll_arm, by=list(df$user_name, df$classe), FUN= mean)
+a5<-aggregate(df$pitch_arm, by=list(df$user_name, df$classe), FUN= mean)
+a6<-aggregate(df$yaw_arm, by=list(df$user_name, df$classe), FUN= mean)
+
+a1
+a2
+a3
+a4
+a5
+```
+
+Grapghs
+```{r }
+library(ggplot2)
+g1<-ggplot(data=df, aes(x=df$classe, y=df$roll_belt, colour= df$user_name))+ geom_boxplot() + 
+  labs(title="Roll belt distribution by classe and user", x="Classe", y="Roll belt")
+          
+g2<-ggplot(data=df, aes(x=df$classe, y=df$pitch_belt, colour= df$user_name))+ geom_boxplot() +
+  labs(title="Pitch belt distribution by classe and user", x="Classe", y="Roll belt")
+
+g3<-ggplot(data=df, aes(x=df$classe, y=df$yaw_belt, colour= df$user_name))+ geom_boxplot() +
+  labs(title="Yaw belt distribution by classe and user", x="Classe", y="Roll belt")
+
+g4<-ggplot(data=df, aes(x=df$classe, y=df$roll_arm, colour= df$user_name))+ geom_boxplot() +
+  labs(title="Roll arm distribution by classe and user", x="Classe", y="Roll belt")
+
+g5<-ggplot(data=df, aes(x=df$classe, y=df$pitch_arm, colour= df$user_name))+ geom_boxplot() +
+ labs(title="Pitch arm distribution by classe and user", x="Classe", y="Roll belt")
+
+g5<-ggplot(data=df, aes(x=df$classe, y=df$total_accel_belt, colour= df$user_name))+ geom_boxplot() +
+  labs(title="Total acceletarion belt distribution by classe and user", x="Classe", y="Roll belt")
+
+library(caret)
+p1<-featurePlot(x=df[,c("roll_belt","pitch_belt","yaw_belt",           
+                         "total_accel_belt")],
+                y=df$classe, plot="pairs")
+
+g1
+g2
+g3
+g4
+g5
+p1
+```
+
+We can tell from total accelaration belt and the roll belt distribution grapghs that there are two very marked groups. One group has higher measures (mean of aporx 120) and groups with lower values (mean near 0). I can tell that Adelmo, Charles and Pedro belong in the high activity group while Carlitos, Eurico and Jeremy belong in the lower activity group. All users perform the 5 types of activities.
+
+##Calssification model: Random Forest 
+
+```{r }
+library(randomForest)
+set.seed(1234)
+fit.forest <- randomForest(classe~., data=df,
+                             na.action=na.roughfix,
+                             importance=TRUE)
+
+importance(fit.forest, type=2)
+fit.forest
+
+forest.pred <- predict(fit.forest, testing)
+forest.pred
+```
+
+
+There were 500 trees grown by sampling 19622 observations with replacement. The out of bag estimate error rate was of 0.28%, this is the error rate obtained by classifying the cases that aren´t selected when building a tree. 
+
+The confusion matrix presented in the summary of the model suggests a very good prediction with a maximum classification error of 6.8% for the D classe.  
+
+
+
